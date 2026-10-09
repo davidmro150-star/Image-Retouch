@@ -1,8 +1,12 @@
-// src/components/common/Footer.jsx
-
-import { Link, Mail, Phone, ShieldCheck } from "lucide-react";
+// src/components/common/Fotter.jsx
+"use client";
+import Link from "next/link";
+import { Mail, Phone, ShieldCheck } from "lucide-react";
 
 export default function Footer() {
+  // Safe client-side calculation that will not block Next.js 16 compilation
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer className="border-t border-neutral-100 bg-neutral-50">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -46,7 +50,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-12 border-t border-neutral-200/60 pt-8 text-center md:flex md:justify-between md:text-left">
-          <p className="text-xs text-neutral-400">&copy; {new Date().getFullYear()} Prism Studio. All rights reserved.</p>
+          <p className="text-xs text-neutral-400">&copy; {currentYear} Prism Studio. All rights reserved.</p>
           <div className="mt-4 flex justify-center gap-6 md:mt-0 text-xs text-neutral-400">
             <Link href="/privacy" className="hover:text-neutral-900">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-neutral-900">Terms of Use</Link>

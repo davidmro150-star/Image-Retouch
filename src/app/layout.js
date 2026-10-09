@@ -1,7 +1,7 @@
 
 import Navbar from "@/components/common/Navbar";
 import "./globals.css";
-import Footer from "@/components/common/Fotter";
+import Footer from "@/components/common/Footer";
 
 export const metadata = {
   title: "Prism Studio | Expert Manual Image Editing Services",
