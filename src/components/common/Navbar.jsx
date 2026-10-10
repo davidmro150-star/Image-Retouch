@@ -73,10 +73,13 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Action CTAs */}
-          <div className="hidden md:flex items-center gap-4">
+          {/* Action CTAs with Visible Signup Button Link */}
+          <div className="hidden md:flex items-center gap-5">
             <Link href="/login" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">
               Sign In
+            </Link>
+            <Link href="/register" className="text-sm font-semibold text-neutral-950 hover:text-neutral-600 transition-colors">
+              Register
             </Link>
             <Link
               href="/quote"
@@ -125,6 +128,7 @@ export default function Navbar() {
 
           <div className="pt-4 border-t border-neutral-100 flex flex-col gap-2">
             <Link onClick={() => setIsOpen(false)} href="/login" className="text-center text-sm font-medium py-2 text-neutral-600">Sign In</Link>
+            <Link onClick={() => setIsOpen(false)} href="/register" className="text-center text-sm font-semibold py-2 text-neutral-950">Register Account</Link>
             <Link onClick={() => setIsOpen(false)} href="/quote" className="block text-center rounded-xl bg-neutral-950 px-4 py-2.5 text-sm font-medium text-white">Get a Quote</Link>
           </div>
         </div>

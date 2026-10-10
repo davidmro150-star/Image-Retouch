@@ -1,27 +1,32 @@
 // src/app/(public)/portfolio/page.jsx
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import BeforeAfterSlider from "@/components/ui/BeforeAfterSlider";
 
-const categories = ["All Work", "Retouching", "Clipping Path", "Image Masking"];
-
-const portfolioItems = [
-  {
-    category: "Retouching",
-    title: "Luxe Fashion Editorial",
-    before: "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='800' height='500' style='background:%23e5e5e5'><text x='50%25' y='50%25' text-anchor='middle' alignment-baseline='middle' font-family='sans-serif' font-size='20' fill='%23999'>Raw Editorial Frame</text></svg>",
-    after: "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='800' height='500' style='background:%23171717'><text x='50%25' y='50%25' text-anchor='middle' alignment-baseline='middle' font-family='sans-serif' font-size='20' fill='%23fff'>Studio Retouched Polish</text></svg>"
-  },
-  {
-    category: "Clipping Path",
-    title: "E-Commerce Product Separation",
-    before: "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='800' height='500' style='background:%23e5e5e5'><text x='50%25' y='50%25' text-anchor='middle' alignment-baseline='middle' font-family='sans-serif' font-size='20' fill='%23999'>Raw Product Studio Shot</text></svg>",
-    after: "data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='800' height='500' style='background:%23f4f4f5'><text x='50%25' y='50%25' text-anchor='middle' alignment-baseline='middle' font-family='sans-serif' font-size='20' fill='%2318181b'>Hand-Drawn Vector Path</text></svg>"
-  }
-];
+const categories = ["All Work", "Retouching", "Clipping Path", "Image Masking", "Background Removal"];
 
 export default function PortfolioPage() {
+  const [portfolioItems, setPortfolioItems] = useState([]);
   const [activeTab, setActiveTab] = useState("All Work");
+  const [loading, setLoading] = useState(true);
+
+  // Pull dynamic image rows down from the database on page mount
+  useEffect(() => {
+    const loadGallery = async () => {
+      try {
+        const res = await fetch("/api/portfolio");
+        if (res.ok) {
+          const data = await res.json();
+          setPortfolioItems(data);
+        }
+      } catch (err) {
+        console.error("Failed to load portfolio grid data stream:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadGallery();
+  }, []);
 
   const filteredItems = portfolioItems.filter(item =>
     activeTab === "All Work" ? true : item.category === activeTab
@@ -37,12 +42,12 @@ export default function PortfolioPage() {
         </div>
 
         {/* Categories Tab Bar */}
-        <div className="flex justify-center gap-2 mb-12">
+        <div className="flex justify-center gap-2 mb-12 overflow-x-auto pb-2">
           {categories.map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${activeTab === tab ? "bg-neutral-950 text-white" : "bg-neutral-50 text-neutral-600 hover:bg-neutral-100"
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors shrink-0 ${activeTab === tab ? "bg-neutral-950 text-white" : "bg-neutral-50 text-neutral-600 hover:bg-neutral-100"
                 }`}
             >
               {tab}
@@ -51,22 +56,28 @@ export default function PortfolioPage() {
         </div>
 
         {/* Dynamic Display Matrix Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredItems.map((item, index) => (
-            <div key={index} className="space-y-3">
-              <BeforeAfterSlider
-                beforeImage={item.before}
-                afterImage={item.after}
-                beforeLabel="Original Input"
-                afterLabel="Manual Studio Edit"
-              />
-              <div className="flex justify-between items-center px-1">
-                <h3 className="text-sm font-semibold text-neutral-950">{item.title}</h3>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 bg-neutral-50 px-2 py-0.5 rounded border border-neutral-200">{item.category}</span>
+        {loading ? (
+          <div className="text-center text-sm font-medium text-neutral-400 py-20">Syncing gallery data logs...</div>
+        ) : filteredItems.length === 0 ? (
+          <div className="text-center text-sm font-medium text-neutral-400 py-20">No matching portfolio projects published yet.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {filteredItems.map((item) => (
+              <div key={item._id} className="space-y-3">
+                <BeforeAfterSlider
+                  beforeImage={item.beforeImageUrl}
+                  afterImage={item.afterImageUrl}
+                  beforeLabel="Original"
+                  afterLabel="Retouched"
+                />
+                <div className="flex justify-between items-center px-1">
+                  <h3 className="text-sm font-semibold text-neutral-950">{item.title}</h3>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 bg-neutral-50 px-2 py-0.5 rounded border border-neutral-200">{item.category}</span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
       </div>
     </div>

@@ -105,12 +105,13 @@ export default function HomePage() {
           <p className="text-sm text-neutral-500">Drag the vertical slider to witness the crisp clarity of manual clipping and professional retouching.</p>
         </div>
         
-        <BeforeAfterSlider
-          beforeImage="https://res.cloudinary.com/res-cloudinary/image/upload/v1/sample.jpg"
-          afterImage="https://res.cloudinary.com/res-cloudinary/image/upload/v1/sample.jpg"
+            <BeforeAfterSlider 
+          beforeImage="data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='800' height='500' style='background:%23e5e5e5'><text x='50%25' y='50%25' text-anchor='middle' alignment-baseline='middle' font-family='sans-serif' font-size='22' fill='%23999'>Raw Camera Frame</text></svg>" 
+          afterImage="data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='800' height='500' style='background:%23171717'><text x='50%25' y='50%25' text-anchor='middle' alignment-baseline='middle' font-family='sans-serif' font-size='22' fill='%23fff'>Studio Retouched Output</text></svg>"
           beforeLabel="Raw Camera Frame"
           afterLabel="Studio Retouched Output"
         />
+
       </section>
 
       {/* 3. CORE SERVICES MATRIX SECTION */}
