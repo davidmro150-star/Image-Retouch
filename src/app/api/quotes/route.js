@@ -1,38 +1,315 @@
+
 // src/app/api/quotes/route.js
+
+import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import Quote from "@/models/Quote";
+import Users from "@/models/Users";
+import jwt from "jsonwebtoken";
 
+export const dynamic = "force-dynamic";
+
+const ALLOWED_SERVICES = [
+  "Image Retouching",
+  "Clipping Path",
+  "Image Masking",
+  "Background Removal",
+];
+
+const ALLOWED_STATUSES = [
+  "Pending",
+  "Reviewed",
+  "Quoted",
+  "Accepted",
+  "Declined",
+];
+
+// Verify the session and check the current database role.
+async function getAdminUser(request) {
+  try {
+    const token = request.cookies.get("prism_session_token")?.value;
+    const secret = process.env.JWT_SECRET;
+
+    if (!token || !secret) return null;
+
+    const payload = jwt.verify(token, secret);
+
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      typeof payload.userId !== "string"
+    ) {
+      return null;
+    }
+
+    const account = await Users.findById(payload.userId)
+      .select("_id role")
+      .lean();
+
+    if (!account) return null;
+
+    const role = String(account.role || "").trim().toLowerCase();
+
+    if (role !== "admin") return null;
+
+    return account;
+  } catch {
+    return null;
+  }
+}
+
+// GET: Admin retrieves all custom quote requests.
+export async function GET(request) {
+  try {
+    await connectToDatabase();
+
+    const admin = await getAdminUser(request);
+
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Admin authentication required." },
+        { status: 403 }
+      );
+    }
+
+    const quotes = await Quote.find({})
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return NextResponse.json(quotes, {
+      status: 200,
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
+  } catch (error) {
+    console.error("GET /api/quotes error:", error);
+
+    return NextResponse.json(
+      { error: "Failed to load quote requests." },
+      { status: 500 }
+    );
+  }
+}
+
+// POST: A client submits a custom quote request.
 export async function POST(request) {
   try {
     await connectToDatabase();
-    const body = await request.json();
-    
-    const { fullName, email, service, imageCount, instructions } = body;
 
-    // Simple backend data safety check
-    if (!fullName || !email || !service || !imageCount) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+    let body;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid request body." },
+        { status: 400 }
+      );
     }
 
-    const newQuote = await Quote.create({
-      fullName,
-      email,
-      service,
-      imageCount,
-      instructions,
-    });
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json(
+        { error: "Invalid request data." },
+        { status: 400 }
+      );
+    }
 
-    return new Response(JSON.stringify({ success: true, data: newQuote }), {
-      status: 201,
-      headers: { "Content-Type": "application/json" },
+    const fullName =
+      typeof body.fullName === "string" ? body.fullName.trim() : "";
+
+    const email =
+      typeof body.email === "string"
+        ? body.email.trim().toLowerCase()
+        : "";
+
+    const service =
+      typeof body.service === "string" ? body.service.trim() : "";
+
+    const imageCount = Number(body.imageCount);
+
+    const instructions =
+      typeof body.instructions === "string"
+        ? body.instructions.trim()
+        : "";
+
+    if (!fullName || fullName.length > 120) {
+      return NextResponse.json(
+        { error: "Please provide a valid full name." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      email.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    ) {
+      return NextResponse.json(
+        { error: "Please provide a valid business email." },
+        { status: 400 }
+      );
+    }
+
+    if (!ALLOWED_SERVICES.includes(service)) {
+      return NextResponse.json(
+        { error: "Please select a valid service." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !Number.isSafeInteger(imageCount) ||
+      imageCount < 1 ||
+      imageCount > 1000000
+    ) {
+      return NextResponse.json(
+        { error: "Image count must be between 1 and 1,000,000." },
+        { status: 400 }
+      );
+    }
+
+    if (instructions.length > 5000) {
+      return NextResponse.json(
+        { error: "Instructions cannot exceed 5,000 characters." },
+        { status: 400 }
+      );
+    }
+
+ console.log("Quote form data:", {
+  fullName,
+  email,
+  service,
+  imageCount,
+});
+
+const newQuote = await Quote.create({
+  fullName,
+  email,
+  service,
+  imageCount,
+  instructions,
+  status: "Pending",
+});
+
+console.log("Quote saved successfully:", newQuote._id);
+    return NextResponse.json(
+      { success: true, data: newQuote },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("POST /api/quotes error:", error);
+
+    return NextResponse.json(
+      { error: "Failed to submit your quote request." },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT: Admin saves pricing, delivery estimate, feedback, and status.
+export async function PUT(request) {
+  try {
+    await connectToDatabase();
+
+    const admin = await getAdminUser(request);
+
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Admin authentication required." },
+        { status: 403 }
+      );
+    }
+
+    let body;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid request body." },
+        { status: 400 }
+      );
+    }
+
+    const id = typeof body.id === "string" ? body.id.trim() : "";
+    const status =
+      typeof body.status === "string" ? body.status.trim() : "";
+
+    if (!id || !/^[a-f\d]{24}$/i.test(id)) {
+      return NextResponse.json(
+        { error: "Invalid quote ID." },
+        { status: 400 }
+      );
+    }
+
+    if (!ALLOWED_STATUSES.includes(status)) {
+      return NextResponse.json(
+        { error: "Please select a valid quote status." },
+        { status: 400 }
+      );
+    }
+
+    let quotedPrice = null;
+
+    if (body.quotedPrice !== null && body.quotedPrice !== "") {
+      quotedPrice = Number(body.quotedPrice);
+
+      if (!Number.isFinite(quotedPrice) || quotedPrice < 0) {
+        return NextResponse.json(
+          { error: "Quoted price must be zero or greater." },
+          { status: 400 }
+        );
+      }
+    }
+
+    const estimatedDelivery =
+      typeof body.estimatedDelivery === "string"
+        ? body.estimatedDelivery.trim()
+        : "";
+
+    const adminFeedback =
+      typeof body.adminFeedback === "string"
+        ? body.adminFeedback.trim()
+        : "";
+
+    if (estimatedDelivery.length > 200 || adminFeedback.length > 5000) {
+      return NextResponse.json(
+        { error: "Delivery estimate or feedback is too long." },
+        { status: 400 }
+      );
+    }
+
+    const updatedQuote = await Quote.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          quotedPrice,
+          estimatedDelivery,
+          adminFeedback,
+          status,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!updatedQuote) {
+      return NextResponse.json(
+        { error: "Quote request not found." },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: updatedQuote,
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error("PUT /api/quotes error:", error);
+
+    return NextResponse.json(
+      { error: "Failed to save the quote response." },
+      { status: 500 }
+    );
   }
 }

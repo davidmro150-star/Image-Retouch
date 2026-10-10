@@ -11,7 +11,21 @@ export async function POST(request) {
   try {
     await connectToDatabase();
 
-    const { email, password } = await request.json();
+    let body;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid request body.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { email, password } = body || {};
 
     if (
       typeof email !== "string" ||
@@ -20,7 +34,10 @@ export async function POST(request) {
       !password
     ) {
       return NextResponse.json(
-        { success: false, error: "Email and password are required." },
+        {
+          success: false,
+          error: "Email and password are required.",
+        },
         { status: 400 }
       );
     }
@@ -31,10 +48,12 @@ export async function POST(request) {
       email: normalizedEmail,
     });
 
-    // Check whether the account exists before accessing its password.
     if (!matchedUser) {
       return NextResponse.json(
-        { success: false, error: "Invalid email or password." },
+        {
+          success: false,
+          error: "Invalid email or password.",
+        },
         { status: 401 }
       );
     }
@@ -46,7 +65,10 @@ export async function POST(request) {
 
     if (!isPasswordValid) {
       return NextResponse.json(
-        { success: false, error: "Invalid email or password." },
+        {
+          success: false,
+          error: "Invalid email or password.",
+        },
         { status: 401 }
       );
     }
@@ -55,16 +77,35 @@ export async function POST(request) {
 
     if (!jwtSecret) {
       console.error("JWT_SECRET is missing from the environment.");
+
       return NextResponse.json(
-        { success: false, error: "Server authentication is not configured." },
+        {
+          success: false,
+          error: "Server authentication is not configured.",
+        },
         { status: 500 }
+      );
+    }
+
+    // Normalize and validate the database role.
+    const normalizedRole = String(matchedUser.role || "")
+      .trim()
+      .toLowerCase();
+
+    if (!["admin", "client"].includes(normalizedRole)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This account has an invalid role. Please contact support.",
+        },
+        { status: 403 }
       );
     }
 
     const customSessionToken = jwt.sign(
       {
         userId: matchedUser._id.toString(),
-        role: matchedUser.role,
+        role: normalizedRole,
         email: matchedUser.email,
         businessName: matchedUser.businessName,
       },
@@ -74,7 +115,7 @@ export async function POST(request) {
 
     const response = NextResponse.json({
       success: true,
-      role: matchedUser.role,
+      role: normalizedRole,
       token: customSessionToken,
       userId: matchedUser._id.toString(),
       businessName: matchedUser.businessName,
@@ -94,7 +135,10 @@ export async function POST(request) {
     console.error("LOGIN API ERROR:", error);
 
     return NextResponse.json(
-      { success: false, error: "An internal authentication error occurred." },
+      {
+        success: false,
+        error: "An internal authentication error occurred.",
+      },
       { status: 500 }
     );
   }

@@ -10,6 +10,8 @@ import {
   PlusCircle,
   Upload,
   RefreshCw,
+  FileText,
+  Save,
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -19,6 +21,19 @@ export default function AdminDashboard() {
   const [updatingId, setUpdatingId] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Custom quote requests
+  const [customQuotes, setCustomQuotes] = useState([]);
+  const [selectedQuote, setSelectedQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteSaving, setQuoteSaving] = useState(false);
+
+  const [quoteResponseForm, setQuoteResponseForm] = useState({
+    quotedPrice: "",
+    estimatedDelivery: "",
+    adminFeedback: "",
+    status: "Pending",
+  });
 
   const [contentForm, setContentForm] = useState({
     title: "",
@@ -55,9 +70,100 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchAdminQuoteRequests = useCallback(async () => {
+    setQuoteLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/quotes", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load quote requests.");
+      }
+
+      setCustomQuotes(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.message || "Could not load quote requests.");
+    } finally {
+      setQuoteLoading(false);
+    }
+  }, []);
   useEffect(() => {
     fetchAdminJobs();
-  }, [fetchAdminJobs]);
+    fetchAdminQuoteRequests();
+  }, [fetchAdminJobs, fetchAdminQuoteRequests]);
+
+  const openQuoteRequest = (quote) => {
+    setSelectedQuote(quote);
+
+    setQuoteResponseForm({
+      quotedPrice: quote.quotedPrice ?? "",
+      estimatedDelivery: quote.estimatedDelivery || "",
+      adminFeedback: quote.adminFeedback || "",
+      status: quote.status || "Pending",
+    });
+
+    setError("");
+    setSuccess("");
+  };
+
+  const saveQuoteResponse = async (e) => {
+    e.preventDefault();
+
+    if (!selectedQuote?._id) {
+      setError("Please select a quote request.");
+      return;
+    }
+
+    setQuoteSaving(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch("/api/quotes", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: selectedQuote._id,
+          quotedPrice:
+            quoteResponseForm.quotedPrice === ""
+              ? null
+              : Number(quoteResponseForm.quotedPrice),
+          estimatedDelivery: quoteResponseForm.estimatedDelivery,
+          adminFeedback: quoteResponseForm.adminFeedback,
+          status: quoteResponseForm.status,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to save quote response.");
+      }
+
+      setCustomQuotes((previous) =>
+        previous.map((quote) =>
+          quote._id === data.data._id ? data.data : quote
+        )
+      );
+
+      setSelectedQuote(data.data);
+      setSuccess("Quote response saved successfully.");
+    } catch (err) {
+      setError(err.message || "Could not save quote response.");
+    } finally {
+      setQuoteSaving(false);
+    }
+  };
 
   // Update an order's status.
   const advanceQuoteStatus = async (id, currentStatus) => {
@@ -240,7 +346,17 @@ export default function AdminDashboard() {
               <BarChart3 className="h-4 w-4" />
               Order Overview
             </button>
-
+            <button
+              type="button"
+              onClick={() => setActiveTab("quote-requests")}
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold ${activeTab === "quote-requests"
+                  ? "bg-neutral-100 text-neutral-950"
+                  : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-950"
+                }`}
+            >
+              <FileText className="h-4 w-4" />
+              <span>Quote Requests</span>
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab("manage-content")}
@@ -309,6 +425,24 @@ export default function AdminDashboard() {
                 Refresh
               </button>
             </div>
+
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+                <p className="text-sm font-medium text-neutral-500">
+                  Total Orders
+                </p>
+
+                <p className="mt-2 text-3xl font-bold text-neutral-950">
+                  {loading ? "..." : quotes.length}
+                </p>
+
+                <p className="mt-1 text-xs text-neutral-500">
+                  All orders in the system
+                </p>
+              </div>
+            </div>
+
 
             <div className="overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-sm">
               {loading ? (
@@ -394,6 +528,273 @@ export default function AdminDashboard() {
             </div>
           </section>
         )}
+
+        
+        {activeTab === "quote-requests" && (
+          <section className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-neutral-950">
+                  Quote Requests
+                </h1>
+                <p className="mt-1 text-sm text-neutral-500">
+                  Review client requirements and provide custom pricing.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchAdminQuoteRequests}
+                disabled={quoteLoading}
+                className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${quoteLoading ? "animate-spin" : ""}`}
+                />
+                Refresh Quotes
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <p className="text-sm font-medium text-neutral-500">
+                Total Quote Requests
+              </p>
+              <p className="mt-2 text-3xl font-bold text-neutral-950">
+                {quoteLoading ? "..." : customQuotes.length}
+              </p>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+              {quoteLoading ? (
+                <p className="py-12 text-center text-sm text-neutral-500">
+                  Loading quote requests...
+                </p>
+              ) : customQuotes.length === 0 ? (
+                <p className="py-12 text-center text-sm text-neutral-500">
+                  No quote requests found.
+                </p>
+              ) : (
+                <table className="w-full border-collapse text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-100 bg-neutral-50 text-xs uppercase tracking-wider text-neutral-500">
+                      <th className="px-5 py-4">Client</th>
+                      <th className="px-5 py-4">Service</th>
+                      <th className="px-5 py-4">Images</th>
+                      <th className="px-5 py-4">Status</th>
+                      <th className="px-5 py-4">Date</th>
+                      <th className="px-5 py-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-neutral-100">
+                    {customQuotes.map((quote) => (
+                      <tr key={quote._id} className="hover:bg-neutral-50/60">
+                        <td className="px-5 py-4">
+                          <p className="font-semibold text-neutral-900">
+                            {quote.fullName}
+                          </p>
+                          <p className="text-xs text-neutral-500">
+                            {quote.email}
+                          </p>
+                        </td>
+
+                        <td className="px-5 py-4">{quote.service}</td>
+                        <td className="px-5 py-4">{quote.imageCount}</td>
+
+                        <td className="px-5 py-4">
+                          <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-medium text-neutral-700">
+                            {quote.status || "Pending"}
+                          </span>
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-4 text-neutral-500">
+                          {quote.createdAt
+                            ? new Date(quote.createdAt).toLocaleDateString()
+                            : "—"}
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openQuoteRequest(quote)}
+                            className="rounded-lg bg-neutral-950 px-3 py-2 text-xs font-semibold text-white hover:bg-neutral-800"
+                          >
+                            Review Request
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {selectedQuote && (
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="space-y-5 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+                  <div>
+                    <h2 className="text-lg font-bold text-neutral-950">
+                      Client Requirements
+                    </h2>
+                    <p className="mt-1 text-sm text-neutral-500">
+                      Full details submitted by the client.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 text-sm">
+                    <div>
+                      <p className="text-neutral-500">Full Name</p>
+                      <p className="mt-1 font-semibold">{selectedQuote.fullName}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-neutral-500">Business Email</p>
+                      <a
+                        href={`mailto:${selectedQuote.email}`}
+                        className="mt-1 inline-block text-blue-700 hover:underline"
+                      >
+                        {selectedQuote.email}
+                      </a>
+                    </div>
+
+                    <div>
+                      <p className="text-neutral-500">Required Service</p>
+                      <p className="mt-1 font-semibold">{selectedQuote.service}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-neutral-500">Estimated Image Count</p>
+                      <p className="mt-1 font-semibold">{selectedQuote.imageCount}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-neutral-500">Instructions & Specifications</p>
+                      <p className="mt-2 whitespace-pre-wrap rounded-lg bg-neutral-50 p-4 leading-6 text-neutral-700">
+                        {selectedQuote.instructions || "No additional instructions provided."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={saveQuoteResponse}
+                  className="space-y-5 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6"
+                >
+                  <div>
+                    <h2 className="text-lg font-bold text-neutral-950">
+                      Admin Response
+                    </h2>
+                    <p className="mt-1 text-sm text-neutral-500">
+                      Set the price and delivery estimate, then write your feedback.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="quote-price" className="text-sm font-medium">
+                      Quoted Price
+                    </label>
+                    <input
+                      id="quote-price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={quoteResponseForm.quotedPrice}
+                      onChange={(e) =>
+                        setQuoteResponseForm((prev) => ({
+                          ...prev,
+                          quotedPrice: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter price"
+                      className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-900"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="quote-delivery" className="text-sm font-medium">
+                      Estimated Delivery
+                    </label>
+                    <input
+                      id="quote-delivery"
+                      type="text"
+                      maxLength={200}
+                      value={quoteResponseForm.estimatedDelivery}
+                      onChange={(e) =>
+                        setQuoteResponseForm((prev) => ({
+                          ...prev,
+                          estimatedDelivery: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g. 3–5 business days"
+                      className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-900"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="quote-status" className="text-sm font-medium">
+                      Status
+                    </label>
+                    <select
+                      id="quote-status"
+                      value={quoteResponseForm.status}
+                      onChange={(e) =>
+                        setQuoteResponseForm((prev) => ({
+                          ...prev,
+                          status: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-lg border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Reviewed">Reviewed</option>
+                      <option value="Quoted">Quoted</option>
+                      <option value="Accepted">Accepted</option>
+                      <option value="Declined">Declined</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="quote-feedback" className="text-sm font-medium">
+                      Feedback / Message to Client
+                    </label>
+                    <textarea
+                      id="quote-feedback"
+                      rows={5}
+                      maxLength={5000}
+                      value={quoteResponseForm.adminFeedback}
+                      onChange={(e) =>
+                        setQuoteResponseForm((prev) => ({
+                          ...prev,
+                          adminFeedback: e.target.value,
+                        }))
+                      }
+                      placeholder="Explain the quote, editing requirements, or any questions for the client..."
+                      className="w-full resize-y rounded-lg border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-900"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={quoteSaving}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-950 px-4 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4" />
+                    {quoteSaving ? "Saving Response..." : "Save Quote Response"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedQuote(null)}
+                    className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                  >
+                    Close Request
+                  </button>
+                </form>
+              </div>
+            )}
+          </section>
+        )}
+        
 
         {activeTab === "manage-content" && (
           <section className="mx-auto max-w-2xl space-y-6 rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-sm sm:p-8">
