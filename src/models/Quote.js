@@ -54,6 +54,16 @@ const QuoteSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    quoteTokenHash: {
+  type: String,
+  default: null,
+  select: false,
+},
+quoteTokenExpiresAt: {
+  type: Date,
+  default: null,
+  select: false,
+},
   },
   { timestamps: true }
 );

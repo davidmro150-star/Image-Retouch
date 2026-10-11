@@ -1,229 +1,146 @@
-
+// src/app/(public)/quote/page.jsx
 "use client";
-
 import { useState } from "react";
-import { Upload, HelpCircle, Layers, CheckCircle2 } from "lucide-react";
+import { Upload, CheckCircle, RefreshCw, ArrowUpRight, Files } from "lucide-react";
 
-export default function GetQuotePage() {
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    service: "Image Retouching",
-    imageCount: "",
-    instructions: "",
-  });
+export default function QuotePage() {
+  const [formData, setFormData] = useState({ name: "", email: "", service: "Image Retouching", notes: "" });
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [currentProgress, setCurrentProgress] = useState(0);
+  const [success, setSuccess] = useState(false);
 
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const convertFileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
 
-  const handleSubmit = async (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-
-    setLoading(true);
-    setError("");
+    if (selectedFiles.length === 0) {
+      alert("Please upload sample frames to process your request.");
+      return;
+    }
+    setSubmitting(true);
+    setCurrentProgress(0);
 
     try {
-      const response = await fetch("/api/quotes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...formData,
-          imageCount: Number(formData.imageCount),
-        }),
-      });
+      const compiledCloudUrls = [];
+      const filesArray = Array.from(selectedFiles);
+      const totalFiles = filesArray.length;
+      let processedCount = 0;
 
-      const result = await response.json();
+      // ⚡ ASYNCHRONOUS SERIAL WORKER ITERATOR: Process images sequentially to protect browser memory pools
+      for (const file of filesArray) {
+        // 1. Wait completely for the individual file binary read to finish
+        const base64String = await convertFileToBase64(file);
 
-      if (!response.ok) {
-        throw new Error(
-          result.error || "Failed to submit your quote request."
-        );
+        // 2. Dispatch data payload packet safely to the server pipeline
+        const frameResponse = await fetch("/api/upload-frame", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ singleImageBase64: base64String })
+        });
+
+        if (frameResponse.ok) {
+          const frameData = await frameResponse.json();
+          compiledCloudUrls.push(frameData.url);
+
+          processedCount++;
+          setCurrentProgress(Math.round((processedCount / totalFiles) * 100)); // Update real-time percentage
+        } else {
+          const frameErr = await frameResponse.json();
+          throw new Error(frameErr.error || "File upload rejected.");
+        }
       }
 
-      setSubmitted(true);
-    } catch (err) {
-      console.error("Quote submission error:", err);
+      // 3. Final single lightweight payload commit directly into MongoDB schemas
+      const res = await fetch("/api/trial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          service: formData.service,
+          notes: formData.notes,
+          uploadedUrls: compiledCloudUrls
+        })
+      });
 
-      setError(
-        err.message || "Something went wrong. Please try again."
-      );
+      if (res.ok) {
+        setSuccess(true);
+        setSelectedFiles([]);
+        setFormData({ name: "", email: "", service: "Image Retouching", notes: "" });
+      } else {
+        alert("The server pool database mapping routine failed.");
+      }
+    } catch (err) {
+      console.error("Ingestion loop broke:", err);
+      alert("Bulk ingestion aborted: " + err.message);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  if (submitted) {
+  if (success) {
     return (
-      <div className="mx-auto max-w-md px-4 py-32 text-center space-y-4">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-900">
-          <CheckCircle2 className="h-6 w-6" />
+      <div className="min-h-[70vh] flex items-center justify-center bg-white px-4">
+        <div className="text-center space-y-4 max-w-md bg-neutral-50 border border-neutral-200 p-8 rounded-2xl shadow-sm animate-in zoom-in-95 duration-200">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-green-600"><CheckCircle className="h-6 w-6" /></div>
+          <h1 className="text-xl font-bold tracking-tight text-neutral-950">Bulk Request Matrix Dispatched!</h1>
+          <p className="text-sm text-neutral-500 leading-relaxed">We have successfully ingested your massive sample asset batch directly into the retoucher shift deck. Your flat-rate production quotation will arrive within 15 minutes.</p>
+          <button onClick={() => setSuccess(false)} className="text-xs font-semibold text-neutral-600 hover:text-neutral-950 underline cursor-pointer">Submit Another Batch</button>
         </div>
-
-        <h1 className="text-2xl font-bold tracking-tight text-neutral-950">
-          Quote Request Received
-        </h1>
-
-        <p className="text-sm text-neutral-500 leading-relaxed">
-          Thank you, {formData.fullName}. A senior retoucher will review
-          your specifications and send a custom quote to {formData.email}{" "}
-          within 45 minutes.
-        </p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white py-16 sm:py-24">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold tracking-tight text-neutral-950 sm:text-4xl">
-            Request a Custom Quote
-          </h1>
-
-          <p className="mt-3 text-sm text-neutral-500">
-            Submit your commercial volume specs. Get a manual evaluation edit for free.
-          </p>
+    <div className="min-h-screen bg-neutral-50/50 py-16 sm:py-24 px-4">
+      <div className="max-w-2xl mx-auto bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-10 shadow-sm space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-950">Request Custom Studio Quote</h1>
+          <p className="text-sm text-neutral-500 mt-1">Upload high-volume sample imagery directly to our processing grid for high-speed automated evaluation.</p>
         </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="border border-neutral-200/80 rounded-2xl p-6 sm:p-10 space-y-6 shadow-sm"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-                Full Name
-              </label>
-
-              <input
-                type="text"
-                required
-                maxLength={120}
-                className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white focus:border-neutral-950 transition-colors"
-                placeholder="John Doe"
-                value={formData.fullName}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    fullName: e.target.value,
-                  })
-                }
-              />
+        <form onSubmit={handleFormSubmit} className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Full Name / Company Identity</label>
+            <input type="text" required placeholder="e.g. Sarah from Nexus Brands" className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Corporate Email Address</label>
+            <input type="email" required placeholder="name@yourcompany.com" className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Required Service Specification</label>
+              <select className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm bg-white" value={formData.service} onChange={(e) => setFormData({ ...formData, service: e.target.value })}><option>Image Retouching</option><option>Clipping Path</option><option>Background Removal</option></select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-                Business Email
+            <div className="space-y-1.5 border border-dashed border-neutral-200 rounded-xl p-4 text-center flex flex-col justify-center bg-neutral-50/30 hover:bg-neutral-50 transition-colors cursor-pointer relative">
+              <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700 block cursor-pointer">
+                <Upload className="mx-auto h-4 w-4 text-neutral-400 mb-1" /> Choose Sample Photos
+                <input type="file" accept="image/*" required multiple className="hidden" onChange={(e) => setSelectedFiles(e.target.files ? e.target.files : [])} />
               </label>
-
-              <input
-                type="email"
-                required
-                maxLength={254}
-                className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white focus:border-neutral-950 transition-colors"
-                placeholder="john@company.com"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    email: e.target.value,
-                  })
-                }
-              />
+              {selectedFiles.length > 0 && (
+                <p className="text-[11px] text-green-600 font-semibold flex items-center justify-center gap-1 mt-1">
+                  <Files className="h-3 w-3" /> ✓ {selectedFiles.length} Images Attached
+                </p>
+              )}
             </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-                Required Service
-              </label>
-
-              <select
-                className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm bg-white focus:border-neutral-950 transition-colors appearance-none"
-                value={formData.service}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    service: e.target.value,
-                  })
-                }
-              >
-                <option>Image Retouching</option>
-                <option>Clipping Path</option>
-                <option>Image Masking</option>
-                <option>Background Removal</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-                Estimated Image Count
-              </label>
-
-              <input
-                type="number"
-                required
-                min="1"
-                max="1000000"
-                step="1"
-                className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white focus:border-neutral-950 transition-colors"
-                placeholder="e.g. 150"
-                value={formData.imageCount}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    imageCount: e.target.value,
-                  })
-                }
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Project Guidelines & Batch Volume Notes</label>
+            <textarea rows={4} required placeholder="State your estimated monthly image volume target, background hex codes (#FFFFFF), margin spacing rules, clipping extensions, or layer delivery formats..." className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white resize-none" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
           </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-              Instructions & Specifications
-            </label>
-
-            <textarea
-              rows={4}
-              required
-              maxLength={5000}
-              className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white focus:border-neutral-950 transition-colors resize-none"
-              placeholder="Please outline background choices, clipping criteria, or shadow requirements..."
-              value={formData.instructions}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  instructions: e.target.value,
-                })
-              }
-            />
-          </div>
-
-          {error && (
-            <p
-              role="alert"
-              className="rounded-lg bg-red-50 p-3 text-sm text-red-700"
-            >
-              {error}
-            </p>
-          )}
-
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-neutral-950 py-3 text-sm font-medium text-white hover:bg-neutral-800 transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading
-                ? "Submitting Request..."
-                : "Submit Detailed Quote Request"}
-            </button>
-          </div>
+          <button type="submit" disabled={submitting} className="w-full rounded-lg bg-neutral-950 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:bg-neutral-300 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm">
+            {submitting ? (
+              <span className="flex items-center gap-2 font-mono"><RefreshCw className="h-4 w-4 animate-spin" /> Upload Progress: {currentProgress}%</span>
+            ) : <>Submit Bulk Quote Request Matrix <ArrowUpRight className="h-4 w-4" /></>}
+          </button>
         </form>
       </div>
     </div>

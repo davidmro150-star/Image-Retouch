@@ -1,926 +1,345 @@
-
+// src/app/admin/page.jsx
 "use client";
-
-import { useCallback, useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   BarChart3,
   Layers,
   LogOut,
+  Clock,
+  AlertCircle,
   PlusCircle,
   Upload,
+  ExternalLink,
   RefreshCw,
-  FileText,
-  Save,
+  X,
+  Trash2,
+  Download // ⚡ IMPORTED DOWNLOAD ICON FOR THE LINK ACTION CODES
 } from "lucide-react";
 
 export default function AdminDashboard() {
   const [quotes, setQuotes] = useState([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState(null);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
-  // Custom quote requests
-  const [customQuotes, setCustomQuotes] = useState([]);
-  const [selectedQuote, setSelectedQuote] = useState(null);
-  const [quoteLoading, setQuoteLoading] = useState(false);
-  const [quoteSaving, setQuoteSaving] = useState(false);
+  // Lightbox Preview Window Hooks
+  const [previewImage, setPreviewImage] = useState(null);
 
-  const [quoteResponseForm, setQuoteResponseForm] = useState({
-    quotedPrice: "",
-    estimatedDelivery: "",
-    adminFeedback: "",
-    status: "Pending",
-  });
-
-  const [contentForm, setContentForm] = useState({
-    title: "",
-    category: "Retouching",
-    beforeImage: null,
-    afterImage: null,
-  });
-
+  // Portfolio Form State System
+  const [contentForm, setContentForm] = useState({ title: "", category: "Retouching", beforeImage: null, afterImage: null });
   const [uploading, setUploading] = useState(false);
 
-  // Load orders using the prism_session_token cookie.
-  const fetchAdminJobs = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
+  const fetchAdminJobs = async () => {
     try {
+      if (typeof window === "undefined") return;
+      const secureToken = localStorage.getItem("prism_token");
       const res = await fetch("/api/orders", {
-        method: "GET",
         cache: "no-store",
-        credentials: "same-origin",
+        headers: { "Authorization": `Bearer ${secureToken}` }
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to load orders.");
+      if (res.ok) {
+        const data = await res.json();
+        setQuotes(data);
       }
-
-      setQuotes(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message || "Could not connect to the orders API.");
+      console.error("Failed to load admin logs:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  const fetchAdminQuoteRequests = useCallback(async () => {
-    setQuoteLoading(true);
-    setError("");
-
-    try {
-      const res = await fetch("/api/quotes", {
-        method: "GET",
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to load quote requests.");
-      }
-
-      setCustomQuotes(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err.message || "Could not load quote requests.");
-    } finally {
-      setQuoteLoading(false);
-    }
-  }, []);
   useEffect(() => {
     fetchAdminJobs();
-    fetchAdminQuoteRequests();
-  }, [fetchAdminJobs, fetchAdminQuoteRequests]);
+  }, []);
 
-  const openQuoteRequest = (quote) => {
-    setSelectedQuote(quote);
-
-    setQuoteResponseForm({
-      quotedPrice: quote.quotedPrice ?? "",
-      estimatedDelivery: quote.estimatedDelivery || "",
-      adminFeedback: quote.adminFeedback || "",
-      status: quote.status || "Pending",
-    });
-
-    setError("");
-    setSuccess("");
-  };
-
-  const saveQuoteResponse = async (e) => {
-    e.preventDefault();
-
-    if (!selectedQuote?._id) {
-      setError("Please select a quote request.");
-      return;
-    }
-
-    setQuoteSaving(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const res = await fetch("/api/quotes", {
-        method: "PUT",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: selectedQuote._id,
-          quotedPrice:
-            quoteResponseForm.quotedPrice === ""
-              ? null
-              : Number(quoteResponseForm.quotedPrice),
-          estimatedDelivery: quoteResponseForm.estimatedDelivery,
-          adminFeedback: quoteResponseForm.adminFeedback,
-          status: quoteResponseForm.status,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to save quote response.");
-      }
-
-      setCustomQuotes((previous) =>
-        previous.map((quote) =>
-          quote._id === data.data._id ? data.data : quote
-        )
-      );
-
-      setSelectedQuote(data.data);
-      setSuccess("Quote response saved successfully.");
-    } catch (err) {
-      setError(err.message || "Could not save quote response.");
-    } finally {
-      setQuoteSaving(false);
-    }
-  };
-
-  // Update an order's status.
   const advanceQuoteStatus = async (id, currentStatus) => {
-    const nextStatus =
-      currentStatus === "Submitted" ? "In Progress" : "Completed";
-
-    setUpdatingId(id);
-    setError("");
-    setSuccess("");
-
+    const nextStatus = currentStatus === "Submitted" ? "In Progress" : "Completed";
+    const secureToken = localStorage.getItem("prism_token");
     try {
       const res = await fetch("/api/orders", {
         method: "PUT",
-        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${secureToken}`
         },
         body: JSON.stringify({ id, nextStatus }),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update order status.");
-      }
-
-      if (!data.data) {
-        throw new Error("The API did not return the updated order.");
-      }
-
-      setQuotes((previous) =>
-        previous.map((quote) =>
-          quote.id === id ? data.data : quote
-        )
-      );
-
-      setSuccess(`Order ${id} updated to ${nextStatus}.`);
+      if (res.ok) fetchAdminJobs();
     } catch (err) {
-      setError(err.message || "Could not update order.");
-    } finally {
-      setUpdatingId(null);
+      console.error(err);
     }
   };
 
-  // Convert an image file to Base64 for the portfolio API.
-  const convertFileToBase64 = (file) =>
-    new Promise((resolve, reject) => {
+  const handleDeleteOrderRow = async (orderId) => {
+    const doubleCheckSafetyGate = window.confirm(`Are you absolutely sure you want to permanently delete order ${orderId}?`);
+    if (!doubleCheckSafetyGate) return;
+
+    const secureToken = localStorage.getItem("prism_token");
+    try {
+      const res = await fetch(`/api/orders?id=${orderId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${secureToken}` }
+      });
+
+      if (res.ok) {
+        alert(`Order ${orderId} wiped out successfully.`);
+        await fetchAdminJobs();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const convertFileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error("Failed to read image."));
       reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
     });
+  };
 
-  // Upload a before/after portfolio pair.
   const handleUploadContent = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    if (!contentForm.title.trim()) {
-      setError("Please enter a project title.");
-      return;
-    }
-
     if (!contentForm.beforeImage || !contentForm.afterImage) {
-      setError("Please select both before and after images.");
+      alert("Please select both before and after image files.");
       return;
     }
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-
-    if (
-      !allowedTypes.includes(contentForm.beforeImage.type) ||
-      !allowedTypes.includes(contentForm.afterImage.type)
-    ) {
-      setError("Use JPG, PNG, or WebP images.");
-      return;
-    }
-
-    const maxSize = 5 * 1024 * 1024;
-
-    if (
-      contentForm.beforeImage.size > maxSize ||
-      contentForm.afterImage.size > maxSize
-    ) {
-      setError("Each image must be 5 MB or smaller.");
-      return;
-    }
-
     setUploading(true);
 
     try {
-      const [beforeImageBase64, afterImageBase64] = await Promise.all([
-        convertFileToBase64(contentForm.beforeImage),
-        convertFileToBase64(contentForm.afterImage),
-      ]);
+      const beforeBase64 = await convertFileToBase64(contentForm.beforeImage);
+      const afterBase64 = await convertFileToBase64(contentForm.afterImage);
 
       const res = await fetch("/api/portfolio", {
         method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: contentForm.title.trim(),
+          title: contentForm.title,
           category: contentForm.category,
-          beforeImageBase64,
-          afterImageBase64,
-        }),
+          beforeImageBase64: beforeBase64,
+          afterImageBase64: afterBase64
+        })
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Portfolio upload failed.");
+      if (res.ok) {
+        alert("Portfolio pair pushed to Cloudinary and live on web gallery!");
+        setContentForm({ title: "", category: "Retouching", beforeImage: null, afterImage: null });
+        setActiveTab("overview");
       }
-
-      setSuccess("Portfolio project uploaded successfully.");
-
-      setContentForm({
-        title: "",
-        category: "Retouching",
-        beforeImage: null,
-        afterImage: null,
-      });
-
-      // Reset the native file inputs.
-      e.target.reset();
     } catch (err) {
-      setError(err.message || "Could not upload portfolio project.");
+      console.error(err);
     } finally {
       setUploading(false);
     }
   };
 
-  const handleSignOut = async () => {
-    // Replace this URL with your actual logout endpoint.
-    try {
-      const res = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "same-origin",
-      });
-
-      if (!res.ok) {
-        throw new Error("Logout failed. Please try again.");
-      }
-
-      window.location.href = "/login";
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-100/60 md:flex-row">
-      {/* Sidebar */}
-      <aside className="flex w-full shrink-0 flex-col justify-between border-b border-neutral-200/80 bg-white p-5 md:w-64 md:border-b-0 md:border-r md:p-6">
+    <div className="min-h-screen bg-neutral-100/60 flex flex-col md:flex-row">
+
+      {/* SIDEBAR NAVIGATION */}
+      <aside className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-neutral-200/80 p-6 flex flex-col justify-between shrink-0">
         <div className="space-y-8">
           <div className="flex items-center gap-2">
-            <span className="text-base font-bold tracking-tight text-neutral-950">
-              PRISM
-              <span className="font-light text-neutral-400">CONTROL</span>
-            </span>
-
-            <span className="rounded bg-neutral-950 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-              Admin
-            </span>
+            <span className="font-bold tracking-tight text-neutral-950 text-base">PRISM<span className="font-light text-neutral-400">CONTROL</span></span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-neutral-950 text-white uppercase tracking-wide">Admin</span>
           </div>
-
-          <nav className="flex gap-2 md:flex-col">
-            <button
-              type="button"
-              onClick={() => setActiveTab("overview")}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold ${activeTab === "overview"
-                  ? "bg-neutral-100 text-neutral-950"
-                  : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-950"
-                }`}
-            >
-              <BarChart3 className="h-4 w-4" />
-              Order Overview
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("quote-requests")}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold ${activeTab === "quote-requests"
-                  ? "bg-neutral-100 text-neutral-950"
-                  : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-950"
-                }`}
-            >
-              <FileText className="h-4 w-4" />
-              <span>Quote Requests</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("manage-content")}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold ${activeTab === "manage-content"
-                  ? "bg-neutral-100 text-neutral-950"
-                  : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-950"
-                }`}
-            >
-              <Layers className="h-4 w-4" />
-              Manage Portfolio
-            </button>
+          <nav className="space-y-1">
+            <button type="button" onClick={() => setActiveTab("overview")} className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-left transition-colors ${activeTab === "overview" ? "bg-neutral-50 text-neutral-950" : "text-neutral-500 hover:text-neutral-950"}`}><BarChart3 className="h-4 w-4" /> Order Overview</button>
+            <button type="button" onClick={() => setActiveTab("manage-content")} className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold text-left transition-colors ${activeTab === "manage-content" ? "bg-neutral-50 text-neutral-950" : "text-neutral-500 hover:text-neutral-950"}`}><Layers className="h-4 w-4" /> Manage Portfolio</button>
           </nav>
         </div>
-
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="mt-6 flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-neutral-500 hover:text-neutral-950"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </button>
+        <div className="pt-6 border-t border-neutral-100">
+          <Link href="/login" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-neutral-500 hover:text-neutral-950 transition-colors"><LogOut className="h-4 w-4" /> Sign Out</Link>
+        </div>
       </aside>
 
-      {/* Main workspace */}
-      <main className="mx-auto w-full max-w-7xl flex-grow space-y-8 p-4 sm:p-8 lg:p-10">
-        {error && (
-          <div
-            role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-          >
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div
-            role="status"
-            className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"
-          >
-            {success}
-          </div>
-        )}
+      {/* OPERATIONS CONSOLE MAIN SPACE */}
+      <main className="flex-grow p-6 sm:p-10 space-y-8 max-w-7xl mx-auto w-full">
 
         {activeTab === "overview" && (
-          <section className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-neutral-950">
-                  Operations Console
-                </h1>
-                <p className="mt-1 text-sm text-neutral-500">
-                  Manage client orders and production progress.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={fetchAdminJobs}
-                disabled={loading}
-                className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </button>
+          <div className="space-y-8">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-neutral-950">Operations Console</h1>
+              <p className="text-xs text-neutral-500">Monitor active manual post-production quotes and updates globally.</p>
             </div>
 
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
-                <p className="text-sm font-medium text-neutral-500">
-                  Total Orders
-                </p>
-
-                <p className="mt-2 text-3xl font-bold text-neutral-950">
-                  {loading ? "..." : quotes.length}
-                </p>
-
-                <p className="mt-1 text-xs text-neutral-500">
-                  All orders in the system
-                </p>
+            {/* Dynamic Metric Display Counters */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white rounded-xl border border-neutral-200/60 p-5 space-y-2 shadow-sm">
+                <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Queue Intake</p>
+                <p className="text-2xl font-bold text-neutral-950">{quotes.filter(q => q.status === "Submitted").length} Orders</p>
+              </div>
+              <div className="bg-white rounded-xl border border-neutral-200/60 p-5 space-y-2 shadow-sm">
+                <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">On Shift</p>
+                <p className="text-2xl font-bold text-neutral-950">{quotes.filter(q => q.status === "In Progress").length} Jobs</p>
+              </div>
+              <div className="bg-white rounded-xl border border-neutral-200/60 p-5 space-y-2 shadow-sm">
+                <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Completed Logs</p>
+                <p className="text-2xl font-bold text-neutral-950">{quotes.filter(q => q.status === "Completed" || q.status === "Revision").length} Active</p>
               </div>
             </div>
 
-
-            <div className="overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-sm">
-              {loading ? (
-                <p className="py-12 text-center text-sm text-neutral-500">
-                  Loading orders...
-                </p>
-              ) : quotes.length === 0 ? (
-                <p className="py-12 text-center text-sm text-neutral-500">
-                  No orders found.
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-sm">
+            {/* Dynamic Logs Table */}
+            <div className="bg-white rounded-xl border border-neutral-200/80 overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
+                <h3 className="text-sm font-bold text-neutral-950 uppercase tracking-wider">Active Project Inquiries</h3>
+              </div>
+              <div className="overflow-x-auto">
+                {loading ? (
+                  <div className="text-center py-12 text-sm text-neutral-400 font-medium flex items-center justify-center gap-2"><RefreshCw className="h-4 w-4 animate-spin" /> Synchronizing master database registries...</div>
+                ) : quotes.length === 0 ? (
+                  <div className="text-center py-12 text-sm text-neutral-400">No active orders inside cluster schemas.</div>
+                ) : (
+                  <table className="w-full text-left text-sm border-collapse">
                     <thead>
-                      <tr className="border-b border-neutral-100 bg-neutral-50 text-xs uppercase tracking-wider text-neutral-500">
-                        <th className="whitespace-nowrap px-5 py-4">Reference ID</th>
-                        <th className="whitespace-nowrap px-5 py-4">Client</th>
-                        <th className="whitespace-nowrap px-5 py-4">Service</th>
-                        <th className="whitespace-nowrap px-5 py-4">Images</th>
-                        <th className="whitespace-nowrap px-5 py-4">Status</th>
-                        <th className="whitespace-nowrap px-5 py-4 text-right">Action</th>
+                      <tr className="bg-neutral-50 text-neutral-400 border-b border-neutral-100 text-xs font-semibold uppercase tracking-wider">
+                        <th className="px-6 py-3.5">Reference ID</th>
+                        <th className="px-6 py-3.5">Client Identity</th>
+                        <th className="px-6 py-3.5">Service Specifications</th>
+                        <th className="px-6 py-3.5">Volume Count</th>
+                        <th className="px-6 py-3.5">System Status</th>
+                        <th className="px-6 py-3.5 text-right">Workflow Tool</th>
                       </tr>
                     </thead>
-
-                    <tbody className="divide-y divide-neutral-100">
+                    <tbody className="divide-y divide-neutral-100 font-medium">
                       {quotes.map((quote) => (
-                        <tr key={quote._id || quote.id} className="hover:bg-neutral-50/60">
-                          <td className="whitespace-nowrap px-5 py-4 font-mono font-bold text-neutral-900">
-                            {quote.id}
+                        <tr key={quote.id} className="hover:bg-neutral-50/40 transition-colors">
+
+                          {/* ⚡ EXTRACTS INTERACTIVE BULK ARRAYS DIRECTLY */}
+                          <td className="px-6 py-4 font-mono font-bold text-neutral-900">
+                            <div className="flex flex-col space-y-1">
+                              <span className="text-neutral-950">{quote.id}</span>
+                              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                {quote.downloadUrls && quote.downloadUrls.length > 0 ? (
+                                  quote.downloadUrls.map((url, index) => (
+                                    <button
+                                      key={index}
+                                      type="button"
+                                      onClick={() => setPreviewImage(url)}
+                                      className="inline-flex items-center text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5 cursor-pointer transition-all"
+                                    >
+                                      Img {index + 1} <ExternalLink className="h-2 w-2 ml-0.5" />
+                                    </button>
+                                  ))
+                                ) : quote.downloadUrl ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewImage(quote.downloadUrl)}
+                                    className="inline-flex items-center text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5 cursor-pointer transition-all"
+                                  >
+                                    Img 1 <ExternalLink className="h-2 w-2 ml-0.5" />
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-neutral-300 font-normal italic select-none">(No Media)</span>
+                                )}
+                              </div>
+                            </div>
                           </td>
 
-                          <td className="px-5 py-4">
-                            <p className="font-semibold text-neutral-900">
-                              {quote.name}
-                            </p>
-                            <p className="text-xs text-neutral-500">
-                              {quote.email}
-                            </p>
+                          <td className="px-6 py-4">
+                            <p className="text-neutral-950 font-semibold">{quote.name}</p>
+                            <p className="text-xs text-neutral-400 font-normal">{quote.email}</p>
                           </td>
-
-                          <td className="whitespace-nowrap px-5 py-4 text-neutral-600">
-                            {quote.service}
+                          <td className="px-6 py-4 text-neutral-600">{quote.service}</td>
+                          <td className="px-6 py-4 text-neutral-950">{quote.images || 0} Frames</td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border ${quote.status === "Submitted" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}>{quote.status}</span>
                           </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-3">
+                              {quote.status !== "Completed" ? (
+                                <button type="button" onClick={() => advanceQuoteStatus(quote.id, quote.status)} className="rounded-lg bg-neutral-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-800 transition-colors shadow-sm cursor-pointer">{quote.status === "Submitted" ? "Assign Retoucher" : "Mark Dispatched"}</button>
+                              ) : (<span className="text-xs font-medium text-neutral-400 italic">Delivered Clean</span>)}
 
-                          <td className="whitespace-nowrap px-5 py-4">
-                            {quote.images}
-                          </td>
-
-                          <td className="whitespace-nowrap px-5 py-4">
-                            <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-medium text-neutral-700">
-                              {quote.status}
-                            </span>
-                          </td>
-
-                          <td className="whitespace-nowrap px-5 py-4 text-right">
-                            {quote.status !== "Completed" ? (
                               <button
                                 type="button"
-                                disabled={updatingId === quote.id}
-                                onClick={() =>
-                                  advanceQuoteStatus(quote.id, quote.status)
-                                }
-                                className="rounded-lg bg-neutral-950 px-3 py-2 text-xs font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                onClick={() => handleDeleteOrderRow(quote.id)}
+                                className="rounded-lg border border-neutral-200 text-neutral-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 p-1.5 transition-colors cursor-pointer"
+                                title="Delete Order"
                               >
-                                {updatingId === quote.id
-                                  ? "Updating..."
-                                  : quote.status === "Submitted"
-                                    ? "Assign Retoucher"
-                                    : "Mark Completed"}
+                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
-                            ) : (
-                              <span className="text-xs text-neutral-400">
-                                Completed
-                              </span>
-                            )}
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        
-        {activeTab === "quote-requests" && (
-          <section className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-neutral-950">
-                  Quote Requests
-                </h1>
-                <p className="mt-1 text-sm text-neutral-500">
-                  Review client requirements and provide custom pricing.
-                </p>
+                )}
               </div>
-
-              <button
-                type="button"
-                onClick={fetchAdminQuoteRequests}
-                disabled={quoteLoading}
-                className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${quoteLoading ? "animate-spin" : ""}`}
-                />
-                Refresh Quotes
-              </button>
             </div>
-
-            <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
-              <p className="text-sm font-medium text-neutral-500">
-                Total Quote Requests
-              </p>
-              <p className="mt-2 text-3xl font-bold text-neutral-950">
-                {quoteLoading ? "..." : customQuotes.length}
-              </p>
-            </div>
-
-            <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
-              {quoteLoading ? (
-                <p className="py-12 text-center text-sm text-neutral-500">
-                  Loading quote requests...
-                </p>
-              ) : customQuotes.length === 0 ? (
-                <p className="py-12 text-center text-sm text-neutral-500">
-                  No quote requests found.
-                </p>
-              ) : (
-                <table className="w-full border-collapse text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50 text-xs uppercase tracking-wider text-neutral-500">
-                      <th className="px-5 py-4">Client</th>
-                      <th className="px-5 py-4">Service</th>
-                      <th className="px-5 py-4">Images</th>
-                      <th className="px-5 py-4">Status</th>
-                      <th className="px-5 py-4">Date</th>
-                      <th className="px-5 py-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-neutral-100">
-                    {customQuotes.map((quote) => (
-                      <tr key={quote._id} className="hover:bg-neutral-50/60">
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-neutral-900">
-                            {quote.fullName}
-                          </p>
-                          <p className="text-xs text-neutral-500">
-                            {quote.email}
-                          </p>
-                        </td>
-
-                        <td className="px-5 py-4">{quote.service}</td>
-                        <td className="px-5 py-4">{quote.imageCount}</td>
-
-                        <td className="px-5 py-4">
-                          <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-medium text-neutral-700">
-                            {quote.status || "Pending"}
-                          </span>
-                        </td>
-
-                        <td className="whitespace-nowrap px-5 py-4 text-neutral-500">
-                          {quote.createdAt
-                            ? new Date(quote.createdAt).toLocaleDateString()
-                            : "—"}
-                        </td>
-
-                        <td className="whitespace-nowrap px-5 py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => openQuoteRequest(quote)}
-                            className="rounded-lg bg-neutral-950 px-3 py-2 text-xs font-semibold text-white hover:bg-neutral-800"
-                          >
-                            Review Request
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            {selectedQuote && (
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-5 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
-                  <div>
-                    <h2 className="text-lg font-bold text-neutral-950">
-                      Client Requirements
-                    </h2>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      Full details submitted by the client.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4 text-sm">
-                    <div>
-                      <p className="text-neutral-500">Full Name</p>
-                      <p className="mt-1 font-semibold">{selectedQuote.fullName}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-neutral-500">Business Email</p>
-                      <a
-                        href={`mailto:${selectedQuote.email}`}
-                        className="mt-1 inline-block text-blue-700 hover:underline"
-                      >
-                        {selectedQuote.email}
-                      </a>
-                    </div>
-
-                    <div>
-                      <p className="text-neutral-500">Required Service</p>
-                      <p className="mt-1 font-semibold">{selectedQuote.service}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-neutral-500">Estimated Image Count</p>
-                      <p className="mt-1 font-semibold">{selectedQuote.imageCount}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-neutral-500">Instructions & Specifications</p>
-                      <p className="mt-2 whitespace-pre-wrap rounded-lg bg-neutral-50 p-4 leading-6 text-neutral-700">
-                        {selectedQuote.instructions || "No additional instructions provided."}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <form
-                  onSubmit={saveQuoteResponse}
-                  className="space-y-5 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6"
-                >
-                  <div>
-                    <h2 className="text-lg font-bold text-neutral-950">
-                      Admin Response
-                    </h2>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      Set the price and delivery estimate, then write your feedback.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="quote-price" className="text-sm font-medium">
-                      Quoted Price
-                    </label>
-                    <input
-                      id="quote-price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={quoteResponseForm.quotedPrice}
-                      onChange={(e) =>
-                        setQuoteResponseForm((prev) => ({
-                          ...prev,
-                          quotedPrice: e.target.value,
-                        }))
-                      }
-                      placeholder="Enter price"
-                      className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-900"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="quote-delivery" className="text-sm font-medium">
-                      Estimated Delivery
-                    </label>
-                    <input
-                      id="quote-delivery"
-                      type="text"
-                      maxLength={200}
-                      value={quoteResponseForm.estimatedDelivery}
-                      onChange={(e) =>
-                        setQuoteResponseForm((prev) => ({
-                          ...prev,
-                          estimatedDelivery: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g. 3–5 business days"
-                      className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-900"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="quote-status" className="text-sm font-medium">
-                      Status
-                    </label>
-                    <select
-                      id="quote-status"
-                      value={quoteResponseForm.status}
-                      onChange={(e) =>
-                        setQuoteResponseForm((prev) => ({
-                          ...prev,
-                          status: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-lg border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="Reviewed">Reviewed</option>
-                      <option value="Quoted">Quoted</option>
-                      <option value="Accepted">Accepted</option>
-                      <option value="Declined">Declined</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="quote-feedback" className="text-sm font-medium">
-                      Feedback / Message to Client
-                    </label>
-                    <textarea
-                      id="quote-feedback"
-                      rows={5}
-                      maxLength={5000}
-                      value={quoteResponseForm.adminFeedback}
-                      onChange={(e) =>
-                        setQuoteResponseForm((prev) => ({
-                          ...prev,
-                          adminFeedback: e.target.value,
-                        }))
-                      }
-                      placeholder="Explain the quote, editing requirements, or any questions for the client..."
-                      className="w-full resize-y rounded-lg border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-900"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={quoteSaving}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-950 px-4 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Save className="h-4 w-4" />
-                    {quoteSaving ? "Saving Response..." : "Save Quote Response"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedQuote(null)}
-                    className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-                  >
-                    Close Request
-                  </button>
-                </form>
-              </div>
-            )}
-          </section>
+          </div>
         )}
-        
 
         {activeTab === "manage-content" && (
-          <section className="mx-auto max-w-2xl space-y-6 rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-sm sm:p-8">
+          <div className="max-w-2xl bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-10 shadow-sm space-y-6">
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-neutral-950">
-                Add Portfolio Project
-              </h1>
-              <p className="mt-1 text-sm text-neutral-500">
-                Upload before-and-after images for your portfolio.
-              </p>
+              <h1 className="text-xl font-bold tracking-tight text-neutral-950">Add Dynamic Portfolio Project</h1>
+              <p className="text-xs text-neutral-500">Upload before/after image pairs directly to Cloudinary.</p>
+            </div>
+            <form onSubmit={handleUploadContent} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Project Display Title</label>
+                <input type="text" required placeholder="e.g. Diamond Ring Project" className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white" value={contentForm.title} onChange={(e) => setContentForm({ ...contentForm, title: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Service Category Tag</label>
+                <select className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm bg-white" value={contentForm.category} onChange={(e) => setContentForm({ ...contentForm, category: e.target.value })}><option>Retouching</option><option>Clipping Path</option></select>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5 border border-dashed border-neutral-200 p-4 rounded-xl text-center">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 cursor-pointer">
+                    <Upload className="mx-auto h-4 w-4 text-neutral-400 mb-1" /> Choose Original (Before)
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => setContentForm({ ...contentForm, beforeImage: e.target.files ? e.target.files : null })} />
+                  </label>
+                </div>
+              </div>
+              <button type="submit" disabled={uploading} className="w-full rounded-lg bg-neutral-950 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:bg-neutral-300 transition-colors flex items-center justify-center gap-2"><PlusCircle className="h-4 w-4" /> Deploy Content</button>
+            </form>
+          </div>
+        )}
+
+      </main>
+
+      {/* ⚡ THE INTERACTIVE VIEWING & DOWNLOAD LIGHTBOX MODAL */}
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-2xl overflow-hidden p-3 shadow-2xl flex flex-col items-center gap-3">
+
+            <div className="w-full flex items-center justify-between border-b border-neutral-100 pb-2">
+              <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Studio Review Monitor</span>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewImage}
+                  download="prism_studio_source_asset"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-950 text-white hover:bg-neutral-800 px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download Asset
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => setPreviewImage(null)}
+                  className="rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-50 p-1.5 transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleUploadContent} className="space-y-5">
-              <div className="space-y-2">
-                <label htmlFor="project-title" className="text-sm font-medium">
-                  Project title
-                </label>
-                <input
-                  id="project-title"
-                  type="text"
-                  required
-                  maxLength={150}
-                  placeholder="Diamond Ring Retouching"
-                  value={contentForm.title}
-                  onChange={(e) =>
-                    setContentForm((prev) => ({
-                      ...prev,
-                      title: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-900"
-                />
-              </div>
+            <img
+              src={previewImage}
+              alt="Client Sample Operational Asset Preview"
+              className="max-w-full max-h-[75vh] object-contain rounded-xl border border-neutral-100 bg-neutral-50 shadow-inner"
+            />
+          </div>
+        </div>
+      )}
 
-              <div className="space-y-2">
-                <label htmlFor="project-category" className="text-sm font-medium">
-                  Category
-                </label>
-                <select
-                  id="project-category"
-                  value={contentForm.category}
-                  onChange={(e) =>
-                    setContentForm((prev) => ({
-                      ...prev,
-                      category: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-lg border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
-                >
-                  <option value="Retouching">Retouching</option>
-                  <option value="Clipping Path">Clipping Path</option>
-                  <option value="Image Masking">Image Masking</option>
-                  <option value="Background Removal">Background Removal</option>
-                </select>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label htmlFor="before-image" className="text-sm font-medium">
-                    Before image
-                  </label>
-                  <input
-                    id="before-image"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    required
-                    onChange={(e) =>
-                      setContentForm((prev) => ({
-                        ...prev,
-                        beforeImage: e.target.files?.[0] || null,
-                      }))
-                    }
-                    className="block w-full text-xs text-neutral-600 file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-2 file:font-medium"
-                  />
-                  {contentForm.beforeImage && (
-                    <p className="truncate text-xs text-green-700">
-                      {contentForm.beforeImage.name}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="after-image" className="text-sm font-medium">
-                    After image
-                  </label>
-                  <input
-                    id="after-image"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    required
-                    onChange={(e) =>
-                      setContentForm((prev) => ({
-                        ...prev,
-                        afterImage: e.target.files?.[0] || null,
-                      }))
-                    }
-                    className="block w-full text-xs text-neutral-600 file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-2 file:font-medium"
-                  />
-                  {contentForm.afterImage && (
-                    <p className="truncate text-xs text-green-700">
-                      {contentForm.afterImage.name}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={uploading}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-950 px-4 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {uploading ? (
-                  "Uploading..."
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4" />
-                    Upload Portfolio Project
-                    <PlusCircle className="h-4 w-4" />
-                  </>
-                )}
-              </button>
-            </form>
-          </section>
-        )}
-      </main>
     </div>
   );
 }
-

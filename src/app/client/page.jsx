@@ -1,59 +1,54 @@
-
+// src/app/client/page.jsx
 "use client";
-
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   PlusCircle,
   FolderOpen,
   Clock,
-  CheckCircle,
   RefreshCw,
-  MessageSquare,
-  ArrowUpRight,
-  Download,
+  Upload,
+  Files,
+  LogOut,
+  AlertTriangle,
+  ArrowUpRight
 } from "lucide-react";
 
-const INITIAL_FORM = {
-  referenceName: "",
-  service: "Image Retouching",
-  images: "",
-  notes: "",
-};
+const INITIAL_FORM = { referenceName: "", service: "Image Retouching", notes: "" };
 
 export default function ClientDashboard() {
   const [orders, setOrders] = useState([]);
   const [newOrderForm, setNewOrderForm] = useState(INITIAL_FORM);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentProgress, setCurrentProgress] = useState(0);
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(false);
   const [businessName, setBusinessName] = useState("Client Workspace");
+  const router = useRouter();
 
-  // Load only the orders permitted by the authenticated session.
   const fetchClientJobs = async () => {
     try {
-      setBusinessName(
-        localStorage.getItem("prism_business") || "Client Workspace"
-      );
+      if (typeof window === "undefined") return;
+      const secureToken = localStorage.getItem("prism_token");
+      setBusinessName(localStorage.getItem("prism_business") || "Client Workspace");
+
+      if (!secureToken) {
+        setAuthError(true);
+        setLoading(false);
+        return;
+      }
 
       const res = await fetch("/api/orders", {
-        method: "GET",
-        credentials: "same-origin",
         cache: "no-store",
+        headers: { "Authorization": `Bearer ${secureToken}` }
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to load your orders.");
-      }
-
-      if (!Array.isArray(data)) {
-        throw new Error("The server returned an unexpected orders response.");
-      }
-
-      setOrders(data);
+      if (res.ok) setOrders(Array.isArray(data) ? data : []);
+      else setAuthError(true);
     } catch (err) {
-      console.error("Failed to load client jobs:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -63,212 +58,150 @@ export default function ClientDashboard() {
     fetchClientJobs();
   }, []);
 
-  // Submit a new job for the authenticated client.
+  const convertFileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const handleCreateJob = async (e) => {
     e.preventDefault();
-
-    if (isSubmitting) return;
-
+    if (selectedFiles.length === 0) {
+      alert("Please upload at least 1 image file for testing purpose.");
+      return;
+    }
     setIsSubmitting(true);
+    setCurrentProgress(0);
+    const secureToken = localStorage.getItem("prism_token");
 
     try {
+      const compiledCloudUrls = [];
+      const filesArray = Array.from(selectedFiles);
+      const totalFiles = filesArray.length;
+
+      // ⚡ ROBUST SEQUENTIAL ITERATOR PIPELINE
+      for (let i = 0; i < totalFiles; i++) {
+        const file = filesArray[i];
+        let base64String;
+
+        try {
+          base64String = await convertFileToBase64(file);
+        } catch (readErr) {
+          console.error("Local file processing error:", readErr);
+          continue; // Skip damaged frames instead of crashing the full deployment
+        }
+
+        const frameResponse = await fetch("/api/upload-frame", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ singleImageBase64: base64String })
+        });
+
+        if (frameResponse.ok) {
+          const frameData = await frameResponse.json();
+          compiledCloudUrls.push(frameData.url);
+          setCurrentProgress(Math.round(((i + 1) / totalFiles) * 100));
+        } else {
+          console.error(`Cloud ingestion rejected frame index code: ${i + 1}`);
+        }
+      }
+
+      if (compiledCloudUrls.length === 0) {
+        alert("Server network error: Asset streaming pipeline could not host frames to Cloudinary.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // ⚡ FORCE PAYLOAD ALIGNMENT WITH BACKENDBlueprints
       const res = await fetch("/api/orders", {
         method: "POST",
-        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${secureToken}`
         },
         body: JSON.stringify({
-          referenceName: newOrderForm.referenceName.trim(),
+          referenceName: newOrderForm.referenceName,
           service: newOrderForm.service,
-          images: Number(newOrderForm.images),
-          notes: newOrderForm.notes.trim(),
+          images: compiledCloudUrls.length,
+          notes: newOrderForm.notes,
+          downloadUrls: compiledCloudUrls, // 🚀 ARRAY INJECTED DIRECTLY HERE
+          downloadUrl: compiledCloudUrls[0] || ""
         }),
       });
 
-      const responseText = await res.text();
-
-      let data;
-
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        console.error("Unexpected API response:", responseText);
-
-        throw new Error(
-          "The server returned an invalid response. Check your Next.js terminal."
-        );
+      if (res.ok) {
+        await fetchClientJobs();
+        setNewOrderForm(INITIAL_FORM);
+        setSelectedFiles([]);
+        setActiveTab("overview");
+      } else {
+        const serverErr = await res.json();
+        alert("Database write error: " + (serverErr.error || "Check validation attributes."));
       }
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to submit the new job.");
-      }
-
-      // Add the saved order immediately, then refresh from the server.
-      if (data.data) {
-        setOrders((currentOrders) => [
-          data.data,
-          ...currentOrders.filter((order) => order.id !== data.data.id),
-        ]);
-      }
-
-      await fetchClientJobs();
-
-      setNewOrderForm({ ...INITIAL_FORM });
-      setActiveTab("overview");
     } catch (err) {
-      console.error("Create job error:", err);
-      alert(err.message || "Unable to submit the job. Please try again.");
+      alert("Critical upload exception breakdown: " + err.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4">
+        <div className="text-center space-y-4 max-w-sm bg-white border p-8 rounded-2xl shadow-sm">
+          <AlertTriangle className="mx-auto h-12 w-12 text-amber-500" />
+          <h1 className="text-lg font-bold text-neutral-950">Session Missing</h1>
+          <button onClick={() => router.push("/login")} className="w-full rounded-lg bg-neutral-950 py-2.5 text-xs font-semibold text-white">Go to Login</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-neutral-100/60 flex flex-col lg:flex-row">
-      <aside className="w-full lg:w-64 bg-white border-b lg:border-b-0 lg:border-r border-neutral-200/80 p-6 flex flex-col justify-between shrink-0">
+      <aside className="w-full lg:w-64 bg-white border-b lg:border-b-0 lg:border-r border-neutral-200 p-6 flex flex-col justify-between shrink-0">
         <div className="space-y-8">
-          <div className="flex items-center gap-2">
-            <span className="font-bold tracking-tight text-neutral-950 text-base">
-              PRISM
-              <span className="font-light text-neutral-400">PORTAL</span>
-            </span>
-          </div>
-
+          <span className="font-bold text-neutral-950 text-base">PRISM<span className="font-light text-neutral-400">PORTAL</span></span>
           <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors shrink-0 ${activeTab === "overview"
-                  ? "bg-neutral-950 text-white"
-                  : "text-neutral-500 hover:text-neutral-950"
-                }`}
-            >
-              <FolderOpen className="h-4 w-4" />
-              Order History
-            </button>
-
-            <button
-              onClick={() => setActiveTab("new-job")}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors shrink-0 ${activeTab === "new-job"
-                  ? "bg-neutral-950 text-white"
-                  : "text-neutral-500 hover:text-neutral-950"
-                }`}
-            >
-              <PlusCircle className="h-4 w-4" />
-              Submit New Job
-            </button>
+            <button type="button" onClick={() => setActiveTab("overview")} className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors shrink-0 ${activeTab === "overview" ? "bg-neutral-950 text-white" : "text-neutral-500 hover:text-neutral-950"}`}><FolderOpen className="h-4 w-4" /> Order History</button>
+            <button type="button" onClick={() => setActiveTab("new-job")} className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors shrink-0 ${activeTab === "new-job" ? "bg-neutral-950 text-white" : "text-neutral-500 hover:text-neutral-950"}`}><PlusCircle className="h-4 w-4" /> Submit New Job</button>
           </nav>
         </div>
+        <button type="button" onClick={() => { localStorage.clear(); router.push("/login"); }} className="flex items-center gap-2 text-xs font-semibold text-neutral-400 hover:text-neutral-950 transition-colors w-full text-left pt-4 border-t border-neutral-100 hidden lg:flex"><LogOut className="h-3.5 w-3.5" /> Sign Out</button>
       </aside>
 
       <main className="flex-grow p-4 sm:p-8 lg:p-10 space-y-8 max-w-7xl mx-auto w-full">
         {activeTab === "overview" && (
           <div className="space-y-8">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-neutral-950">
-                {businessName} Retouch Workspace
-              </h1>
-              <p className="text-xs text-neutral-500">
-                Track your projects, check order progress, and request
-                revisions for completed work.
-              </p>
-            </div>
-
+            <div><h1 className="text-2xl font-bold tracking-tight text-neutral-950">{businessName} Workspace</h1><p className="text-xs text-neutral-500">Track your projects, check order progress, and request revisions for completed work.</p></div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl border border-neutral-200/60 p-4 space-y-1 shadow-sm">
-                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                  Total Projects
-                </p>
-                <p className="text-xl font-bold text-neutral-950">
-                  {orders.length}
-                </p>
-              </div>
-
-              <div className="bg-white rounded-xl border border-neutral-200/60 p-4 space-y-1 shadow-sm">
-                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                  In Production
-                </p>
-                <p className="text-xl font-bold text-blue-600">
-                  {
-                    orders.filter(
-                      (o) =>
-                        o.status === "In Progress" ||
-                        o.status === "Submitted"
-                    ).length
-                  }
-                </p>
-              </div>
-
-              <div className="bg-white rounded-xl border border-neutral-200/60 p-4 space-y-1 shadow-sm">
-                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                  In Revision
-                </p>
-                <p className="text-xl font-bold text-amber-600">
-                  {orders.filter((o) => o.status === "Revision").length}
-                </p>
-              </div>
-
-              <div className="bg-white rounded-xl border border-neutral-200/60 p-4 space-y-1 shadow-sm">
-                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                  Delivered Ready
-                </p>
-                <p className="text-xl font-bold text-green-600">
-                  {orders.filter((o) => o.status === "Completed").length}
-                </p>
-              </div>
+              <div className="bg-white rounded-xl border border-neutral-200/60 p-4 space-y-1 shadow-sm"><p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Total Projects</p><p className="text-xl font-bold text-neutral-950">{orders.length}</p></div>
+              <div className="bg-white rounded-xl border border-neutral-200/60 p-4 space-y-1 shadow-sm"><p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">In Production</p><p className="text-xl font-bold text-blue-600">{orders.filter(o => o.status === "In Progress" || o.status === "Submitted").length}</p></div>
+              <div className="bg-white rounded-xl border border-neutral-200/60 p-4 space-y-1 shadow-sm"><p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">In Revision</p><p className="text-xl font-bold text-amber-600">{orders.filter(o => o.status === "Revision").length}</p></div>
+              <div className="bg-white rounded-xl border border-neutral-200/60 p-4 space-y-1 shadow-sm"><p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Delivered Ready</p><p className="text-xl font-bold text-green-600">{orders.filter(o => o.status === "Completed").length}</p></div>
             </div>
-
             <div className="space-y-4">
-              <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider">
-                Current Pipeline Log
-              </h2>
-
+              <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider">Current Pipeline Log</h2>
               {loading ? (
-                <div className="text-center py-12 text-sm text-neutral-400 font-medium flex items-center justify-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Fetching cloud project rows...
-                </div>
+                <div className="text-center py-12 text-sm text-neutral-400 font-medium flex items-center justify-center gap-2"><RefreshCw className="h-4 w-4 animate-spin" /> Fetching cloud project rows...</div>
               ) : orders.length === 0 ? (
-                <div className="text-center bg-white border border-neutral-200 rounded-xl py-12 text-sm text-neutral-400">
-                  No project orders logged. Click "Submit New Job" to begin.
-                </div>
+                <div className="text-center bg-white border border-neutral-200 rounded-xl py-12 text-sm text-neutral-400">No project orders logged. Click "Submit New Job" to begin.</div>
               ) : (
                 orders.map((job) => (
-                  <div
-                    key={job.id}
-                    className="bg-white rounded-xl border border-neutral-200/80 p-5 sm:p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
-                  >
+                  <div key={job.id} className="bg-white rounded-xl border border-neutral-200/80 p-5 sm:p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-in fade-in duration-200">
                     <div className="space-y-2 max-w-xl">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-mono font-bold text-neutral-900 bg-neutral-50 px-2 py-0.5 rounded border border-neutral-200">
-                          {job.id}
-                        </span>
-
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium border ${job.status === "Submitted"
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-blue-50 text-blue-700 border-blue-200"
-                            }`}
-                        >
-                          <Clock className="h-2.5 w-2.5" />
-                          {job.status}
+                        <span className="text-xs font-mono font-bold text-neutral-900 bg-neutral-50 px-2 py-0.5 rounded border border-neutral-200">{job.id}</span>
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium border bg-amber-50 text-amber-700 border-amber-200">
+                          <Clock className="h-2.5 w-2.5" /> {job.status}
                         </span>
                       </div>
-
-                      <h3 className="text-base font-bold text-neutral-950">
-                        {job.referenceName}
-                      </h3>
-
-                      <p className="text-xs text-neutral-500">
-                        <span className="font-semibold text-neutral-700">
-                          {job.service}
-                        </span>{" "}
-                        &bull; {job.images} High-Res Frames
-                      </p>
-
-                      <p className="text-xs text-neutral-400 leading-relaxed italic">
-                        Briefing: "{job.notes}"
-                      </p>
+                      <h3 className="text-base font-bold text-neutral-950">{job.referenceName}</h3>
+                      <p className="text-xs text-neutral-500"><span className="font-semibold text-neutral-700">{job.service}</span> &bull; {job.images} High-Res Frames</p>
+                      <p className="text-xs text-neutral-400 leading-relaxed italic">Briefing: "{job.notes}"</p>
                     </div>
                   </div>
                 ))
@@ -279,107 +212,31 @@ export default function ClientDashboard() {
 
         {activeTab === "new-job" && (
           <div className="max-w-2xl bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-10 shadow-sm space-y-6">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-neutral-950">
-                Initialize New Project Batch
-              </h1>
-              <p className="text-xs text-neutral-500">
-                Outline image targets and constraints.
-              </p>
-            </div>
-
+            <div><h1 className="text-xl font-bold tracking-tight text-neutral-950">Initialize New Project Batch</h1><p className="text-xs text-neutral-500">Outline image targets, upload testing arrays, and state constraints.</p></div>
             <form onSubmit={handleCreateJob} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-                  Project Reference Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Winter Jacket Drop 2026"
-                  className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white"
-                  value={newOrderForm.referenceName}
-                  onChange={(e) =>
-                    setNewOrderForm({
-                      ...newOrderForm,
-                      referenceName: e.target.value,
-                    })
-                  }
-                />
+                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Project Reference Name</label>
+                <input type="text" required placeholder="e.g. Winter Jacket Drop 2026" className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white" value={newOrderForm.referenceName} onChange={(e) => setNewOrderForm({ ...newOrderForm, referenceName: e.target.value })} />
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-                    Service Category
-                  </label>
-                  <select
-                    className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm bg-white"
-                    value={newOrderForm.service}
-                    onChange={(e) =>
-                      setNewOrderForm({
-                        ...newOrderForm,
-                        service: e.target.value,
-                      })
-                    }
-                  >
-                    <option>Image Retouching</option>
-                    <option>Clipping Path</option>
-                    <option>Background Removal</option>
-                  </select>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Service Category</label>
+                  <select className="w-full rounded-lg border border-neutral-200 px-4 py-3 text-sm bg-white" value={newOrderForm.service} onChange={(e) => setNewOrderForm({ ...newOrderForm, service: e.target.value })}><option>Image Retouching</option><option>Clipping Path</option><option>Background Removal</option></select>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-                    Total Frame Volume
+                <div className="space-y-1.5 border border-dashed border-neutral-200 rounded-xl p-4 text-center flex flex-col justify-center bg-neutral-50/30 hover:bg-neutral-50 transition-colors cursor-pointer relative">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700 block cursor-pointer">
+                    <Upload className="mx-auto h-4 w-4 text-neutral-400 mb-1" /> Attach Test Images
+                    <input type="file" accept="image/*" required multiple className="hidden" onChange={(e) => setSelectedFiles(e.target.files ? e.target.files : [])} />
                   </label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    max="10000"
-                    step="1"
-                    placeholder="e.g. 75"
-                    className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white"
-                    value={newOrderForm.images}
-                    onChange={(e) =>
-                      setNewOrderForm({
-                        ...newOrderForm,
-                        images: e.target.value,
-                      })
-                    }
-                  />
+                  {selectedFiles.length > 0 && <p className="text-[11px] text-green-600 font-semibold mt-1"><Files className="h-3 w-3 inline mr-1" /> ✓ {selectedFiles.length} Attached</p>}
                 </div>
               </div>
-
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-                  Meticulous Notes
-                </label>
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="Clearly outline background codes, shadow depths, or specific retouch rules..."
-                  className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white resize-none"
-                  value={newOrderForm.notes}
-                  onChange={(e) =>
-                    setNewOrderForm({
-                      ...newOrderForm,
-                      notes: e.target.value,
-                    })
-                  }
-                />
+                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Meticulous Notes</label>
+                <textarea rows={4} required placeholder="Outline backdrop hex rules..." className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white resize-none" value={newOrderForm.notes} onChange={(e) => setNewOrderForm({ ...newOrderForm, notes: e.target.value })} />
               </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full rounded-lg bg-neutral-950 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:bg-neutral-300 transition-colors flex items-center justify-center gap-2"
-              >
-                {isSubmitting
-                  ? "Syncing System..."
-                  : "Deploy Active Job Assignment"}
-                <ArrowUpRight className="h-4 w-4" />
+              <button type="submit" disabled={isSubmitting} className="w-full rounded-lg bg-neutral-950 py-3 text-sm font-semibold text-white flex items-center justify-center gap-2">
+                {isSubmitting ? <span className="flex items-center gap-2 font-mono"><RefreshCw className="h-4 w-4 animate-spin" /> Streaming: {currentProgress}%</span> : <>Deploy Active Job Assignment <ArrowUpRight className="h-4 w-4" /></>}
               </button>
             </form>
           </div>
