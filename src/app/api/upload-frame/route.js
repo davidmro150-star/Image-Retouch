@@ -5,15 +5,6 @@ import { uploadMediaAsset } from "@/lib/cloudinary";
 
 export const dynamic = "force-dynamic";
 
-// ⚡ CRITICAL FIX: Expands body parsing limits to 50MB per request
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "50mb",
-    },
-  },
-};
-
 export async function POST(request) {
   try {
     await connectToDatabase();
@@ -24,9 +15,7 @@ export async function POST(request) {
       return NextResponse.json({ error: "Missing frame payload string." }, { status: 400 });
     }
 
-    // Process single frame upload
     const secureCloudUrl = await uploadMediaAsset(singleImageBase64, "prism_bulk_intake");
-    
     return NextResponse.json({ success: true, url: secureCloudUrl }, { status: 200 });
   } catch (error) {
     console.error("Frame Stream Failure:", error);

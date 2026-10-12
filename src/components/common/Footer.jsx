@@ -8,13 +8,13 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-neutral-100 bg-neutral-50">
+    <footer className=" bg-[#0F172A]">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
 
           <div className="space-y-4">
-            <span className="font-bold tracking-tight text-neutral-900">
-              PRISM<span className="font-light text-neutral-500">STUDIO</span>
+            <span className="font-bold tracking-tight text-[#2563eb]">
+              PRISM<span className="font-light text-[#FCE7F3]">STUDIO</span>
             </span>
             <p className="text-sm text-neutral-500 leading-relaxed">
               Meticulous, 100% human-driven manual photo editing and technical clipping paths for professional studios and eCommerce entities globally.

@@ -16,7 +16,7 @@ export default function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-neutral-100 bg-white/90 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 w-full border-b border-neutral-100 bg-[#0F172A] backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 justify-between items-center">
 
@@ -25,17 +25,17 @@ export default function Navbar() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-950 text-white">
               <Sparkles className="h-4 w-4" />
             </div>
-            <span className="font-bold tracking-tight text-lg text-neutral-900">
-              PRISM<span className="font-light text-neutral-500">STUDIO</span>
+            <span className="font-bold tracking-tight text-lg text-[#2563eb]">
+              PRISM<span className="font-light text-[#FCE7F3]">STUDIO</span>
             </span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">
+            <Link href="/" className="text-sm font-medium text-white hover:text-[#A78BFA] transition-colors">
               Home
             </Link>
-            <Link href="/about" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">
+            <Link href="/about" className="text-sm font-medium text-white hover:text-[#A78BFA] transition-colors">
               About
             </Link>
 
@@ -45,18 +45,18 @@ export default function Navbar() {
               onMouseEnter={() => setDropdownOpen(true)}
               onMouseLeave={() => setDropdownOpen(false)}
             >
-              <button className="flex items-center gap-1 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors py-2">
+              <button className="flex items-center gap-1 text-sm font-medium text-white hover:text-[#A78BFA]transition-colors py-2">
                 Services
                 <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {dropdownOpen && (
-                <div className="absolute left-0 w-56 rounded-xl border border-neutral-100 bg-white p-2 shadow-xl ring-1 ring-black/5">
+                <div className="absolute left-0 w-56 rounded-xl border border-neutral-100 bg-[#f7f0e6] p-2 shadow-xl ring-1 ring-black/5">
                   {servicesList.map((service) => (
                     <Link
                       key={service.href}
                       href={service.href}
-                      className="block rounded-lg px-4 py-2.5 text-sm text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
+                      className="block rounded-lg px-4 py-2.5 text-sm font-semibold text-[#000] hover:bg-neutral-50  transition-colors"
                     >
                       {service.name}
                     </Link>
@@ -65,25 +65,25 @@ export default function Navbar() {
               )}
             </div>
 
-            <Link href="/portfolio" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">
+            <Link href="/portfolio" className="text-sm font-medium text-white hover:text-[#A78BFA]transition-colors">
               Portfolio
             </Link>
-            <Link href="/contact" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">
+            <Link href="/contact" className="text-sm font-medium text-white hover:text-[#A78BFA] transition-colors">
               Contact
             </Link>
           </div>
 
           {/* Action CTAs with Visible Signup Button Link */}
           <div className="hidden md:flex items-center gap-5">
-            <Link href="/login" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">
+            <Link href="/login" className="text-sm font-medium text-white hover:text-[#A78BFA] transition-colors">
               Sign In
             </Link>
-            <Link href="/register" className="text-sm font-semibold text-neutral-950 hover:text-neutral-600 transition-colors">
+            <Link href="/register" className="text-sm font-semibold text-white hover:text-[#A78BFA]transition-colors">
               Register
             </Link>
             <Link
               href="/quote"
-              className="rounded-full bg-neutral-950 px-5 py-2 text-sm font-medium text-white hover:bg-neutral-800 transition-colors shadow-sm"
+              className="rounded-full bg-white px-5 py-2 text-sm font-medium text-[#000] hover:bg-[#A78BFA] transition-colors shadow-sm"
             >
               Get a Quote
             </Link>

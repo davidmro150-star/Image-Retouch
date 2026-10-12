@@ -16,11 +16,13 @@ const OrderSchema = new mongoose.Schema(
     notes: { type: String, required: true },
     name: { type: String, default: "Client Brand Manager" },
     email: { type: String, default: "client@company.com" },
-    // ⚡ UPGRADED FIELD: Now holds an array stack of multiple Cloudinary asset web links!
-    downloadUrls: { type: [String], default: [] },
-    downloadUrl: { type: String, default: "" } // Fallback tracking key string
+    downloadUrls: { type: [String], default: [] }, // Holds multiple Cloudinary links
+    downloadUrl: { type: String, default: "" } 
   },
-  { timestamps: true }
+  { 
+    timestamps: true,
+    collection: "orders" // ⚡ CRITICAL FIX: Forces Mongoose to bind directly to your original data pool rows!
+  }
 );
 
 export default mongoose.models.Order || mongoose.model("Order", OrderSchema);
