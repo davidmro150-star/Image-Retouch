@@ -39,24 +39,47 @@ export default function Navbar() {
               About
             </Link>
 
-            {/* Dropdown Menu */}
+            
+
+
+            
             <div
               className="relative"
               onMouseEnter={() => setDropdownOpen(true)}
               onMouseLeave={() => setDropdownOpen(false)}
             >
-              <button className="flex items-center gap-1 text-sm font-medium text-white hover:text-[#A78BFA]transition-colors py-2">
-                Services
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
+              <div className="flex items-center gap-1">
+                {/* Click Services to open the main Services page */}
+                <Link
+                  href="/services"
+                  className="py-2 text-sm font-medium text-white transition-colors hover:text-[#A78BFA]"
+                >
+                  Services
+                </Link>
+
+                {/* Dropdown indicator */}
+                <button
+                  type="button"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  aria-label="Toggle services dropdown"
+                  aria-expanded={dropdownOpen}
+                  className="rounded-md p-2 text-white transition-colors duration-200 hover:bg-[#A78BFA] hover:text-white"
+                >
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform duration-200 ${dropdownOpen ? "rotate-180" : ""
+                      }`}
+                  />
+                </button>
+              </div>
 
               {dropdownOpen && (
-                <div className="absolute left-0 w-56 rounded-xl border border-neutral-100 bg-[#f7f0e6] p-2 shadow-xl ring-1 ring-black/5">
+                <div className="absolute left-0 top-full z-50 w-56 rounded-xl border border-neutral-100 bg-[#f7f0e6] p-2 shadow-xl ring-1 ring-black/5">
                   {servicesList.map((service) => (
                     <Link
                       key={service.href}
                       href={service.href}
-                      className="block rounded-lg px-4 py-2.5 text-sm font-semibold text-[#000] hover:bg-neutral-50  transition-colors"
+                      onClick={() => setDropdownOpen(false)}
+            className="block rounded-lg px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[#000] hover:text-white "
                     >
                       {service.name}
                     </Link>
@@ -64,10 +87,9 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+            
 
-            <Link href="/portfolio" className="text-sm font-medium text-white hover:text-[#A78BFA]transition-colors">
-              Portfolio
-            </Link>
+
             <Link href="/contact" className="text-sm font-medium text-white hover:text-[#A78BFA] transition-colors">
               Contact
             </Link>

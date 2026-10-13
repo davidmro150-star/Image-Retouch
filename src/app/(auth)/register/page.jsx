@@ -60,12 +60,12 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center bg-neutral-50/50 px-4 py-12">
-      <div className="w-full max-w-md bg-white rounded-2xl border border-neutral-200/80 p-8 shadow-sm space-y-6">
+    <div className="min-h-[80vh] flex items-center justify-center  bg-white px-4 py-12">
+      <div className="w-full max-w-md rounded-2xl bg-[#fff] shadow-[0_12px_35px_rgba(0,0,0,0.25)] p-8 space-y-6">
 
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-950">Create Client Profile</h1>
-          <p className="text-xs text-neutral-400">Register your brand studio to begin outsourcing manual post-production jobs.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-black">Create Client Profile</h1>
+          <p className="text-[16px] text-neutral-800">Register your brand studio to begin outsourcing manual post-production jobs.</p>
         </div>
 
         {error && (
@@ -76,12 +76,12 @@ export default function RegisterPage() {
 
         <form onSubmit={handleRegisterSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Studio / Business Name</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-black">Studio / Business Name</label>
             <div className="relative">
-              <User className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+              <User className="absolute left-3 top-3 h-4 w-4 text-[#F97316]" />
               <input
                 type="text" required placeholder="e.g. Acme Studio"
-                className="w-full rounded-lg border border-neutral-200 bg-white pl-10 pr-4 py-2.5 text-sm focus:border-neutral-950 transition-colors"
+                className="w-full rounded-lg border border-neutral-800 bg-white pl-10 pr-4 py-2.5 text-sm focus:border-neutral-950 transition-colors"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
               />
@@ -89,12 +89,12 @@ export default function RegisterPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Business Email</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-black">Business Email</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+              <Mail className="absolute left-3 top-3 h-4 w-4 text-[#F97316]" />
               <input
                 type="email" required placeholder="name@company.com"
-                className="w-full rounded-lg border border-neutral-200 bg-white pl-10 pr-4 py-2.5 text-sm focus:border-neutral-950 transition-colors"
+                className="w-full rounded-lg border border-neutral-800 bg-white pl-10 pr-4 py-2.5 text-sm focus:border-neutral-950 transition-colors"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -102,12 +102,12 @@ export default function RegisterPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Create Security Key</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-black">Create Security Key</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-3 h-4 w-4 text-neutral-400" />
+              <Lock className="absolute left-3 top-3 h-4 w-4 text-[#F97316]" />
               <input
                 type="password" required placeholder="••••••••"
-                className="w-full rounded-lg border border-neutral-200 bg-white pl-10 pr-4 py-2.5 text-sm focus:border-neutral-950 transition-colors"
+                className="w-full rounded-lg border border-neutral-800 bg-white pl-10 pr-4 py-2.5 text-sm focus:border-neutral-950 transition-colors"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />

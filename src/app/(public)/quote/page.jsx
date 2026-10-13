@@ -100,8 +100,8 @@ export default function QuotePage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50/50 py-16 sm:py-24 px-4">
-      <div className="max-w-2xl mx-auto bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-10 shadow-sm space-y-8">
+    <div className="min-h-screen bg-white py-16 sm:py-24 px-4">
+      <div className="max-w-2xl mx-auto bg-[#fff] shadow-[0_12px_35px_rgba(0,0,0,0.25)] rounded-2xl p-6 sm:p-10 space-y-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-neutral-950">Request Custom Studio Quote</h1>
           <p className="text-sm text-neutral-500 mt-1">Upload high-volume sample imagery directly to our processing grid for high-speed automated evaluation.</p>

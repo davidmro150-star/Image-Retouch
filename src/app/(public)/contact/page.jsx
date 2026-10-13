@@ -14,13 +14,13 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="bg-white py-16 sm:py-24">
+    <div className="bg-white py-8 sm:py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
         {/* Header Block */}
-        <div className="max-w-2xl mx-auto text-center mb-16">
-          <h1 className="text-3xl font-bold tracking-tight text-neutral-950 sm:text-4xl">Connect With Our Studio</h1>
-          <p className="mt-3 text-sm text-neutral-500">
+        <div className="max-w-2xl mx-auto text-center mb-6">
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-950 sm:text-4xl">Connect With Our Studio</h1>
+          <p className="mt-3 sm:text-sm text-neutral-800">
             Have questions about production bandwidth or custom enterprise pricing frameworks? Drop us a line.
           </p>
         </div>
@@ -28,7 +28,7 @@ export default function ContactPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start max-w-5xl mx-auto">
 
           {/* Column 1 & 2: Dynamic Contact Form Panel */}
-          <div className="lg:col-span-2 border border-neutral-200/80 rounded-2xl p-6 sm:p-10 shadow-sm bg-white">
+          <div className="lg:col-span-2 rounded-2xl p-6 sm:p-10  bg-[#fff] shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
             {sent ? (
               <div className="text-center py-12 space-y-3">
                 <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-neutral-50 text-neutral-950">
@@ -42,11 +42,11 @@ export default function ContactPage() {
             ) : (
               <form onSubmit={handleMessageSubmit} className="space-y-5">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Your Identity</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#000]">Your Identity</label>
                   <input
                     type="text"
                     required
-                    className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white focus:border-neutral-950 transition-colors"
+                    className="w-full rounded-lg border border-black px-4 py-2.5 text-sm bg-white focus:border-neutral-950 transition-colors"
                     placeholder="e.g. Alex Mercer"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -54,11 +54,11 @@ export default function ContactPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Mailing Endpoint</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-black">Mailing Endpoint</label>
                   <input
                     type="email"
                     required
-                    className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white focus:border-neutral-950 transition-colors"
+             className="w-full rounded-lg border border-black px-4 py-2.5 text-sm bg-white focus:border-black transition-colors"
                     placeholder="alex@studio.com"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -66,11 +66,11 @@ export default function ContactPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Message Context</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-black">Message Context</label>
                   <textarea
                     rows={5}
                     required
-                    className="w-full rounded-lg border border-neutral-200 px-4 py-2.5 text-sm bg-white focus:border-neutral-950 transition-colors resize-none"
+                className="w-full rounded-lg border border-black px-4 py-2.5 text-sm bg-white focus:border-black transition-colors resize-none"
                     placeholder="Detail your requirements here..."
                     value={form.message}
                     onChange={(e) => setForm({ ...form, message: e.target.value })}
@@ -88,31 +88,31 @@ export default function ContactPage() {
           </div>
 
           {/* Column 3: Corporate Metadata Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-6 bg-white  shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
             <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-6 space-y-4">
-              <h3 className="text-sm font-bold text-neutral-950 uppercase tracking-wider">Studio Desks</h3>
+              <h3 className="text-sm font-bold text-black uppercase tracking-wider">Studio Desks</h3>
 
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
-                  <Mail className="h-4 w-4 text-neutral-400 mt-0.5 shrink-0" />
+                  <Mail className="h-4 w-4 text-[#E11D48] font-bold mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-medium text-neutral-400">Production Queries</p>
-                    <p className="text-sm font-semibold text-neutral-950">production@prismstudio.com</p>
+                    <p className="text-xs  font-bold text-[#F97316]">Production Queries</p>
+                    <p className="text-sm font-semibold text-black">production@prismstudio.com</p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <Phone className="h-4 w-4 text-neutral-400 mt-0.5 shrink-0" />
+                  <Phone className="h-4 w-4 text-[#E11D48] font-bold  mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-medium text-neutral-400">Direct Telephone</p>
+                    <p className="text-xs font-bold text-[#F97316]">Direct Telephone</p>
                     <p className="text-sm font-semibold text-neutral-950">+1 (555) 901-2384</p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <Clock className="h-4 w-4 text-neutral-400 mt-0.5 shrink-0" />
+                  <Clock className="h-4 w-4 text-[#E11D48] font-bold mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-medium text-neutral-400">Desk Timings</p>
+                    <p className="text-xs font-bold text-[#F97316]">Desk Timings</p>
                     <p className="text-sm font-semibold text-neutral-950">Mon - Sat: 24 Hours Active</p>
                   </div>
                 </div>
